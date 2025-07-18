@@ -20,6 +20,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('group_id')->nullable()->constrained('groups');
             $table->string('name');
+            $table->foreignId('leader_id')->nullable()->constrained('users');
             $table->timestamps();
         });
 
