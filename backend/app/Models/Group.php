@@ -20,12 +20,4 @@ class Group extends Model
     {
         return $this->hasMany(Team::class);
     }
-
-    /**
-     * グループ内の試合とのリレーション
-     */
-    public function matches()
-    {
-        return $this->hasMany(Match::class);
-    }
 }
