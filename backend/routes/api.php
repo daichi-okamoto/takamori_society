@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\GroupController;
+use App\Http\Controllers\Api\PlayerController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
