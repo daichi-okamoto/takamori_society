@@ -3,47 +3,51 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Team;
 use Illuminate\Http\Request;
 
 class TeamController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        //
+        return Team::with('group')->get();
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'group_id' => 'nullable|exists:groups,id',
+                'leader_id' => 'nullable|exists:users,id',
+            ]);
+
+            $team = Team::create($request->only(['name', 'group_id', 'leader_id']));
+
+            return response()->json($team, 201);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function update(Request $request, Team $team)
     {
-        //
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'group_id' => 'nullable|exists:groups,id',
+            'leader_id' => 'nullable|exists:users,id',
+        ]);
+
+        $team->update($request->only(['name', 'group_id', 'leader_id']));
+
+        return response()->json($team);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function destroy(Team $team)
     {
-        //
-    }
+        $team->delete();
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json(['message' => '削除しました']);
     }
 }
