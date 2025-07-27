@@ -4,24 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Team;
 
 class Player extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'team_id',
         'name',
+        'kana',
         'address',
         'date_of_birth',
     ];
 
     /**
-     * チームとのリレーション
+     * チームとの多対多リレーション（中間テーブル）
      */
-    public function team()
+    public function teams()
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsToMany(Team::class)
+                    ->withPivot('joined_at', 'left_at')
+                    ->withTimestamps();
     }
 }

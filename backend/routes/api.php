@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\PlayerController;
+use App\Http\Controllers\Api\GameController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -41,3 +42,5 @@ Route::middleware(['auth:sanctum'])->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('players', PlayerController::class);
 });
+
+Route::middleware('auth:sanctum')->apiResource('games', GameController::class);

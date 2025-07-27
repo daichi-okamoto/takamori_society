@@ -24,25 +24,36 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // playersテーブル
+        // playersテーブル（team_idは削除）
         Schema::create('players', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('team_id')->constrained('teams');
             $table->string('name');
             $table->string('address');
             $table->date('date_of_birth');
             $table->timestamps();
         });
 
-        // matchesテーブル
-        Schema::create('matches', function (Blueprint $table) {
+        // player_teamテーブル
+        Schema::create('player_team', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('player_id')->constrained()->onDelete('cascade');
+            $table->foreignId('team_id')->constrained()->onDelete('cascade');
+            $table->date('joined_at');
+            $table->date('left_at')->nullable();
+            $table->timestamps();
+        });
+
+        // gamesテーブル（★バックアップカラム追加済み）
+        Schema::create('games', function (Blueprint $table) {
             $table->id();
             $table->foreignId('group_id')->nullable()->constrained('groups');
             $table->date('date');
             $table->time('time');
             $table->string('place');
-            $table->foreignId('team_a_id')->constrained('teams');
-            $table->foreignId('team_b_id')->constrained('teams');
+            $table->foreignId('team_a_id')->constrained('teams')->onDelete('restrict');
+            $table->foreignId('team_b_id')->constrained('teams')->onDelete('restrict');
+            $table->string('team_a_name_backup')->nullable(); // 追加
+            $table->string('team_b_name_backup')->nullable(); // 追加
             $table->integer('team_a_score')->nullable();
             $table->integer('team_b_score')->nullable();
             $table->string('status');
@@ -73,7 +84,7 @@ return new class extends Migration
         // notificationsテーブル
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('team_id')->nullable()->constrained('teams');
+            $table->foreignId('team_id')->nullable()->constrained('teams')->onDelete('cascade');
             $table->string('title');
             $table->text('message');
             $table->timestamp('sent_at')->nullable();
@@ -89,8 +100,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // usersテーブルはLaravel標準があるので省略可
-        // 必要ならrole追加
+        // users テーブルに role 追加
         Schema::table('users', function (Blueprint $table) {
             $table->enum('role', ['admin', 'team_leader', 'member'])->default('member');
         });
@@ -98,11 +108,12 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::dropIfExists('player_team');
         Schema::dropIfExists('galleries');
         Schema::dropIfExists('notifications');
         Schema::dropIfExists('announcements');
         Schema::dropIfExists('rankings');
-        Schema::dropIfExists('matches');
+        Schema::dropIfExists('games');
         Schema::dropIfExists('players');
         Schema::dropIfExists('teams');
         Schema::dropIfExists('groups');

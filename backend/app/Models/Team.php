@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Game;
 
 class Team extends Model
 {
@@ -15,35 +16,55 @@ class Team extends Model
         'leader_id',
     ];
 
-    /**
-     * グループとのリレーション
-     */
     public function group()
     {
         return $this->belongsTo(Group::class);
     }
 
-    /**
-     * チームリーダー（usersテーブル）とのリレーション
-     */
     public function leader()
     {
         return $this->belongsTo(User::class, 'leader_id');
     }
 
-    /**
-     * 選手一覧（playersテーブル）とのリレーション
-     */
     public function players()
     {
-        return $this->hasMany(Player::class);
+        return $this->belongsToMany(Player::class)
+                    ->withPivot('joined_at', 'left_at')
+                    ->withTimestamps();
     }
 
-    /**
-     * このチームの順位情報
-     */
     public function ranking()
     {
         return $this->hasOne(Ranking::class);
+    }
+
+    /**
+     * モデル削除時の処理：player_teamのdetach、future games削除
+     */
+    protected static function booted()
+    {
+    static::deleting(function (Team $team) {
+        $today = now()->toDateString();
+
+        // 未来の試合は削除（従来どおり）
+        Game::where(function ($query) use ($team) {
+                $query->where('team_a_id', $team->id)
+                      ->orWhere('team_b_id', $team->id);
+            })
+            ->where('date', '>', $today)
+            ->delete();
+
+        // 過去の試合にバックアップ名を保存
+        Game::where('team_a_id', $team->id)
+            ->where('date', '<=', $today)
+            ->update(['team_a_name_backup' => $team->name]);
+
+        Game::where('team_b_id', $team->id)
+            ->where('date', '<=', $today)
+            ->update(['team_b_name_backup' => $team->name]);
+
+        // 中間テーブルをdetach
+        $team->players()->detach();
+    });
     }
 }
