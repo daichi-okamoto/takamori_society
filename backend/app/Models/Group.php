@@ -11,7 +11,21 @@ class Group extends Model
 
     protected $fillable = [
         'name',
+        'tournament_id', // ← 追加
     ];
+
+    /**
+     * 所属するトーナメント
+     */
+    public function tournament()
+    {
+        return $this->belongsTo(Tournament::class);
+    }
+
+    public function games()
+    {
+        return $this->hasMany(Game::class);
+    }
 
     /**
      * 所属チームとのリレーション

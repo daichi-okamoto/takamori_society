@@ -10,13 +10,12 @@ class TeamSeeder extends Seeder
     public function run(): void
     {
         $teamNumber = 1;
-
-        foreach ([1, 2, 3] as $groupId) {
+        foreach (range(1, 3) as $groupId) {
             for ($i = 1; $i <= 5; $i++) {
                 Team::create([
-                    'group_id' => $groupId,
                     'name' => "チーム{$teamNumber}",
-                    'leader_id' => null, // 必要に応じてユーザーIDをセット
+                    'group_id' => $groupId,
+                    'leader_id' => 2, // 上で作った代表者を仮割り当て
                 ]);
                 $teamNumber++;
             }

@@ -14,7 +14,7 @@ class PlayerController extends Controller
     public function index()
     {
         return response()->json(
-            Player::with('team')->get()
+            Player::with('teams')->get()
         );
     }
 

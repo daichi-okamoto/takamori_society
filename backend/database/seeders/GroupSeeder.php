@@ -9,8 +9,11 @@ class GroupSeeder extends Seeder
 {
     public function run(): void
     {
-        Group::create(['name' => 'グループA']);
-        Group::create(['name' => 'グループB']);
-        Group::create(['name' => 'グループC']);
+        foreach (['A', 'B', 'C'] as $name) {
+            Group::create([
+                'tournament_id' => 1,
+                'name' => "グループ{$name}",
+            ]);
+        }
     }
 }

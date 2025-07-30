@@ -27,12 +27,14 @@ class TeamResource extends Resource
                     ->label('チーム名')
                     ->required()
                     ->maxLength(255),
-
-                Select::make('group_id')
-                    ->label('所属グループ')
-                    ->relationship('group', 'name')
-                    ->preload()
-                    ->searchable(),
+                TextInput::make('leader.name')
+                    ->label('代表者')
+                    ->required()
+                    ->maxLength(255),
+                TextInput::make('leader.email')
+                    ->label('メールアドレス')
+                    ->required()
+                    ->maxLength(255),
             ]);
     }
 
@@ -45,15 +47,22 @@ class TeamResource extends Resource
                     ->sortable()
                     ->searchable(),
 
-                TextColumn::make('group.name')
-                    ->label('所属グループ')
+                // 代表者名を表示
+                TextColumn::make('leader.name')
+                    ->label('代表者')
                     ->sortable()
+                    ->searchable(),
+
+                // 連絡先 (メールアドレス) を表示
+                TextColumn::make('leader.email')
+                    ->label('連絡先')
                     ->searchable(),
             ])
             ->filters([
                 //
             ])
             ->actions([
+                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
@@ -84,6 +93,7 @@ class TeamResource extends Resource
             'index' => Pages\ListTeams::route('/'),
             'create' => Pages\CreateTeam::route('/create'),
             'edit' => Pages\EditTeam::route('/{record}/edit'),
+            'view' => Pages\ViewTeam::route('/{record}'),
         ];
     }
 }

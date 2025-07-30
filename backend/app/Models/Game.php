@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\GameStatus;
 
 class Game extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'group_id',
+        'tournament_id',  // ← 追加
         'date',
         'time',
         'place',
@@ -21,12 +22,16 @@ class Game extends Model
         'status',
     ];
 
+    protected $casts = [
+        'status' => GameStatus::class,
+    ];
+
     /**
-     * グループとのリレーション
+     * 大会とのリレーション
      */
-    public function group()
+    public function tournament()
     {
-        return $this->belongsTo(Group::class);
+        return $this->belongsTo(Tournament::class);
     }
 
     /**
@@ -43,5 +48,23 @@ class Game extends Model
     public function teamB()
     {
         return $this->belongsTo(Team::class, 'team_b_id');
+    }
+
+    public function getMatchCardAttribute(): string
+    {
+        return ($this->teamA?->name ?? '未定') . ' vs ' . ($this->teamB?->name ?? '未定');
+    }
+
+    public function group()
+    {
+        return $this->belongsTo(Group::class);
+    }
+
+    public function getMatchResultAttribute(): string
+    {
+        if ($this->status === \App\Enums\GameStatus::Finished) {
+            return ($this->team_a_score ?? '-') . ' - ' . ($this->team_b_score ?? '-');
+        }
+        return '未試合';
     }
 }

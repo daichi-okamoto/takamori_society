@@ -16,6 +16,9 @@ class Team extends Model
         'leader_id',
     ];
 
+    /**
+     * このチームが所属するグループ（トーナメント内のグループ）
+     */
     public function group()
     {
         return $this->belongsTo(Group::class);
@@ -43,28 +46,38 @@ class Team extends Model
      */
     protected static function booted()
     {
-    static::deleting(function (Team $team) {
-        $today = now()->toDateString();
+        static::deleting(function (Team $team) {
+            $today = now()->toDateString();
 
-        // 未来の試合は削除（従来どおり）
-        Game::where(function ($query) use ($team) {
-                $query->where('team_a_id', $team->id)
-                      ->orWhere('team_b_id', $team->id);
-            })
-            ->where('date', '>', $today)
-            ->delete();
+            // 未来の試合は削除（従来どおり）
+            Game::where(function ($query) use ($team) {
+                    $query->where('team_a_id', $team->id)
+                        ->orWhere('team_b_id', $team->id);
+                })
+                ->where('date', '>', $today)
+                ->delete();
 
-        // 過去の試合にバックアップ名を保存
-        Game::where('team_a_id', $team->id)
-            ->where('date', '<=', $today)
-            ->update(['team_a_name_backup' => $team->name]);
+            // 過去の試合にバックアップ名を保存
+            Game::where('team_a_id', $team->id)
+                ->where('date', '<=', $today)
+                ->update(['team_a_name_backup' => $team->name]);
 
-        Game::where('team_b_id', $team->id)
-            ->where('date', '<=', $today)
-            ->update(['team_b_name_backup' => $team->name]);
+            Game::where('team_b_id', $team->id)
+                ->where('date', '<=', $today)
+                ->update(['team_b_name_backup' => $team->name]);
 
-        // 中間テーブルをdetach
-        $team->players()->detach();
-    });
+            // 中間テーブルをdetach
+            $team->players()->detach();
+        });
+    }
+
+    public function gamesAsTeamA()
+    {
+        return $this->hasMany(Game::class, 'team_a_id');
+    }
+
+    public function gamesAsTeamB()
+    {
+        return $this->hasMany(Game::class, 'team_b_id');
     }
 }
