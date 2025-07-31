@@ -19,14 +19,24 @@ class PlayerResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('name')
+            // --- ユーザーテーブル更新 ---
+            Forms\Components\TextInput::make('user.name')
                 ->label('名前')
-                ->required(),
+                ->required()
+                ->afterStateHydrated(fn ($component, $record) => 
+                    $component->state($record->user?->name)
+                )
+                ->dehydrated(true),
 
-            Forms\Components\TextInput::make('kana')
+            Forms\Components\TextInput::make('user.kana')
                 ->label('フリガナ')
-                ->required(),
+                ->required()
+                ->afterStateHydrated(fn ($component, $record) => 
+                    $component->state($record->user?->kana)
+                )
+                ->dehydrated(true),
 
+            // --- Playerテーブル更新 ---
             Forms\Components\TextInput::make('address')
                 ->label('住所')
                 ->required(),
@@ -47,8 +57,8 @@ class PlayerResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')->label('名前'),
-                Tables\Columns\TextColumn::make('kana')->label('フリガナ'),
+                Tables\Columns\TextColumn::make('user.name')->label('名前'),
+                Tables\Columns\TextColumn::make('user.kana')->label('フリガナ'),
                 Tables\Columns\TextColumn::make('address')->label('住所'),
                 Tables\Columns\TextColumn::make('date_of_birth')->label('生年月日')->date(),
                 Tables\Columns\TextColumn::make('teams.name')
@@ -63,9 +73,18 @@ class PlayerResource extends Resource
                     ->multiple(false),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->mutateFormDataUsing(function (array $data, $record) {
+                        // Userテーブルの更新
+                        $record->user->update([
+                            'name' => $data['user.name'] ?? $record->user->name,
+                            'kana' => $data['user.kana'] ?? $record->user->kana,
+                        ]);
+                        return $data;
+                    }),
                 Tables\Actions\DeleteAction::make(),
             ])
+
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

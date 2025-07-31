@@ -10,10 +10,10 @@ class Player extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name',
-        'kana',
+        'user_id',
         'address',
         'date_of_birth',
+        'phone',
     ];
 
     /**
@@ -24,5 +24,12 @@ class Player extends Model
         return $this->belongsToMany(Team::class)
             ->withPivot('joined_at', 'left_at')
             ->withTimestamps();
+    }
+    /**
+     * ユーザーとのリレーション
+     */
+    public function user()
+    {
+        return $this->belongsTo(\App\Models\User::class);
     }
 }
