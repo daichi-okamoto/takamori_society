@@ -1,0 +1,15 @@
+cat <<'EOF' > .gitignore
+# Laravel
+backend/vendor
+backend/node_modules
+backend/public/storage
+backend/storage/*.key
+backend/.env
+
+# Flutter
+mobile/build
+mobile/.dart_tool
+mobile/.idea
+mobile/.packages
+mobile/ios/Pods
+EOF
