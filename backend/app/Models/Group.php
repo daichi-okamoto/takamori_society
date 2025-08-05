@@ -32,6 +32,8 @@ class Group extends Model
      */
     public function teams()
     {
-        return $this->hasMany(Team::class);
+        return $this->belongsToMany(Team::class, 'tournament_team')
+                    ->withPivot('group_id')
+                    ->withTimestamps();
     }
 }

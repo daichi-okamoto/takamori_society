@@ -20,7 +20,9 @@ class ViewTournament extends ViewRecord
 
         $this->groups = $tournament->groups->map(function ($group) {
             foreach ($group->teams as $team) {
-                $played = $team->gamesAsTeamA->merge($team->gamesAsTeamB);
+                $played = $team->gamesAsTeamA
+                    ->merge($team->gamesAsTeamB)
+                    ->filter(fn($game) => $game->status === \App\Enums\GameStatus::Finished);
 
                 $stats = [
                     'match_played' => $played->count(), // ✅ 試合数を追加

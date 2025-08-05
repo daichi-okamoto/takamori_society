@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Tournament extends Model
 {
@@ -21,15 +22,11 @@ class Tournament extends Model
         return $this->hasMany(Group::class);
     }
 
-    public function teams()
+    // チームとの多対多リレーション（pivot に group_id を含む）
+    public function teams(): BelongsToMany
     {
-        return $this->hasManyThrough(
-            Team::class,
-            Group::class,
-            'tournament_id', // groups テーブルの外部キー
-            'group_id',      // teams テーブルの外部キー
-            'id',            // tournaments テーブルの主キー
-            'id'             // groups テーブルの主キー
-        );
+        return $this->belongsToMany(Team::class, 'tournament_team')
+                    ->withPivot('group_id')
+                    ->withTimestamps();
     }
 }

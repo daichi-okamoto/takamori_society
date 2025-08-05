@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Game;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Team extends Model
 {
@@ -79,5 +80,13 @@ class Team extends Model
     public function gamesAsTeamB()
     {
         return $this->hasMany(Game::class, 'team_b_id');
+    }
+
+    // トーナメントチームの中間テーブル
+    public function tournaments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Tournament::class, 'tournament_team')
+                    ->withPivot('group_id')
+                    ->withTimestamps();
     }
 }

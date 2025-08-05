@@ -11,19 +11,20 @@ class Game extends Model
     use HasFactory;
 
     protected $fillable = [
-        'tournament_id',  // ← 追加
-        'date',
-        'time',
-        'place',
+        'tournament_id',
+        'group_id',
+        'game_date',
         'team_a_id',
         'team_b_id',
         'team_a_score',
         'team_b_score',
         'status',
+        'stage',
     ];
 
     protected $casts = [
         'status' => GameStatus::class,
+        'game_date' => 'datetime',
     ];
 
     /**
