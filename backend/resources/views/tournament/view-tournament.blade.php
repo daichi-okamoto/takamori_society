@@ -52,6 +52,7 @@
                         <th class="border px-4 py-2 whitespace-nowrap">カード</th>
                         <th class="border px-4 py-2 whitespace-nowrap">スコア</th>
                         <th class="border px-4 py-2 whitespace-nowrap">ステージ</th>
+                        <th class="border px-4 py-2 whitespace-nowrap">通知</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -61,6 +62,14 @@
                             <td class="border px-4 py-2 whitespace-nowrap">{{ $game->match_card }}</td>
                             <td class="border px-4 py-2 whitespace-nowrap">{{ $game->match_result }}</td>
                             <td class="border px-4 py-2 whitespace-nowrap">{{ ucfirst($game->stage) }}</td>
+                            <td class="border px-4 py-2 whitespace-nowrap">
+                                <form action="{{ route('games.notify', $game->id) }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="px-3 py-1 bg-blue-500 text-white rounded">
+                                        通知を送信
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

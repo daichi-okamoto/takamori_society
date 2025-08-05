@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\GameController;
+use App\Http\Controllers\Api\FcmTokenController;
+use App\Http\Controllers\Api\GameNotificationController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -44,3 +46,10 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->apiResource('games', GameController::class);
+
+// FCMトークン登録（認証必須）
+Route::middleware('auth:sanctum')->post('/fcm/token', [FcmTokenController::class, 'store']);
+
+// 試合通知送信（認証必須）
+Route::middleware('auth:sanctum')->post('/games/{game}/notify', [GameNotificationController::class, 'send'])
+    ->name('games.notify');
