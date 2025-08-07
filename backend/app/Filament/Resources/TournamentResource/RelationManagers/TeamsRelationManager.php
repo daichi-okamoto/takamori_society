@@ -12,7 +12,7 @@ use App\Models\Team;
 class TeamsRelationManager extends RelationManager
 {
     protected static string $relationship = 'teams';
-    protected static ?string $recordTitleAttribute = 'name'; // チーム名をタイトルに
+    protected static ?string $title = 'チーム';
 
     public function form(Form $form): Form
     {
@@ -95,11 +95,11 @@ class TeamsRelationManager extends RelationManager
                             )
                             ->required(),
                     ])
-                    ->action(function ($record, array $data) {
-                        $this->ownerRecord->teams()->attach($record->id, [
+                    ->action(function ($data) {
+                        $this->ownerRecord->teams()->attach($data['team_id'], [
                             'group_id' => $data['group_id'],
                         ]);
-                    }),
+                    })
             ])
             ->actions([
                 Tables\Actions\DetachAction::make()->label('大会から外す'),

@@ -11,7 +11,7 @@ use Filament\Tables\Table;
 class GamesRelationManager extends RelationManager
 {
     protected static string $relationship = 'games';
-    protected static ?string $recordTitleAttribute = 'id'; // 試合IDをタイトルに
+    protected static ?string $title = '試合';
 
     public function form(Form $form): Form
     {

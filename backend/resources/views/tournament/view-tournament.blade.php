@@ -63,11 +63,12 @@
                             <td class="border px-4 py-2 whitespace-nowrap">{{ $game->match_result }}</td>
                             <td class="border px-4 py-2 whitespace-nowrap">{{ ucfirst($game->stage) }}</td>
                             <td class="border px-4 py-2 whitespace-nowrap">
-                                <form action="{{ route('games.notify', $game->id) }}" method="POST">
+                                <form action="{{ route('games.notify', $game->id) }}" method="POST"
+                                    onsubmit="return confirm('この試合の通知を送信しますか？')">
                                     @csrf
-                                    <button type="submit" class="px-3 py-1 bg-blue-500 text-white rounded">
-                                        通知を送信
-                                    </button>
+                                    <x-filament::button type="submit" color="primary">
+                                        試合通知
+                                    </x-filament::button>
                                 </form>
                             </td>
                         </tr>

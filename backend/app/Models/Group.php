@@ -24,7 +24,8 @@ class Group extends Model
 
     public function games()
     {
-        return $this->hasMany(Game::class);
+        return $this->hasMany(Game::class)
+                    ->where('tournament_id', $this->tournament_id);
     }
 
     /**

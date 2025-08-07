@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Game;
+use App\Models\User;
+use App\Models\Notification as NotificationModel;
 use App\Services\FcmService;
 use Illuminate\Support\Facades\DB;
+use Filament\Notifications\Notification;
 
 class GameNotificationController extends Controller
 {
@@ -18,6 +21,17 @@ class GameNotificationController extends Controller
         foreach ($teamIds as $teamId) {
             if (!$teamId) continue;
 
+            // 通知DBにも保存（← teamごとに分けて作成）
+            NotificationModel::create([
+                'title' => '試合通知',
+                'message' => "{$game->teamA->name} vs {$game->teamB->name} の試合が予定されています。\n" .
+                            "日時: {$game->game_date->format('Y-m-d H:i')}",
+                'target_type' => 'team_players',
+                'tournament_id' => optional($game->group)->tournament_id,
+                'team_id' => $teamId, // ✅ ループ中のチームを紐づけ
+                'sent_at' => now(),
+            ]);
+
             // チーム所属選手のユーザーを取得
             $players = DB::table('player_team')
                 ->join('players', 'player_team.player_id', '=', 'players.id')
@@ -28,8 +42,7 @@ class GameNotificationController extends Controller
                 ->get();
 
             foreach ($players as $player) {
-                $user = \App\Models\User::find($player->id);
-
+                $user = User::find($player->id);
                 if (!$user) continue;
 
                 foreach ($user->fcmTokens as $token) {
@@ -42,6 +55,13 @@ class GameNotificationController extends Controller
             }
         }
 
-        return response()->json(['message' => '通知を送信しました']);
+        // ✅ フロント通知（Filament上部に表示）
+        Notification::make()
+            ->title('通知送信完了')
+            ->success()
+            ->body("{$game->game_date->format('Y-m-d H:i')} の試合通知を送信しました。")
+            ->send();
+
+        return redirect()->back();
     }
 }

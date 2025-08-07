@@ -27,14 +27,23 @@ class TeamResource extends Resource
                     ->label('チーム名')
                     ->required()
                     ->maxLength(255),
-                TextInput::make('leader.name')
+
+                // 代表者選択（usersテーブルのnameを表示）
+                Select::make('leader_id')
                     ->label('代表者')
+                    ->relationship('leader', 'name')
+                    ->searchable()
+                    ->preload()
                     ->required()
-                    ->maxLength(255),
-                TextInput::make('leader.email')
+                    ->reactive()
+                    ->afterStateUpdated(fn ($state, callable $set) =>
+                        $set('leader_email', \App\Models\User::find($state)?->email)
+                    ),
+
+                TextInput::make('leader_email')
                     ->label('メールアドレス')
-                    ->required()
-                    ->maxLength(255),
+                    ->disabled()
+                    ->dehydrated(false)
             ]);
     }
 
@@ -84,7 +93,9 @@ class TeamResource extends Resource
 
     public static function getRelations(): array
     {
-        return [];
+        return [
+            \App\Filament\Resources\TeamResource\RelationManagers\PlayersRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

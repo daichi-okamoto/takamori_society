@@ -24,12 +24,14 @@ class ViewTeam extends ViewRecord
                 TextEntry::make('leader.name')
                     ->label('代表者'),
 
-                TextEntry::make('leader.phone')
+                TextEntry::make('leader.email')
                     ->label('連絡先'),
 
-                TextEntry::make('group.tournament.name')
+                TextEntry::make('tournaments.name')
                     ->label('参加大会')
-                    ->default('未登録'),
+                    ->listWithLineBreaks() // 複数を改行で表示
+                    ->separator(', ')
+                    ->placeholder('未登録'),
 
                 TextEntry::make('created_at')
                     ->dateTime('Y-m-d H:i')

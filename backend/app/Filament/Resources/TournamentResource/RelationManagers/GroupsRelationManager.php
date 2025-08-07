@@ -11,7 +11,7 @@ use Filament\Tables\Table;
 class GroupsRelationManager extends RelationManager
 {
     protected static string $relationship = 'groups';
-    protected static ?string $recordTitleAttribute = 'name'; // グループ名をタイトルに
+    protected static ?string $title = 'グループ';
 
     public function form(Form $form): Form
     {
