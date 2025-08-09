@@ -29,4 +29,9 @@ class Tournament extends Model
                     ->withPivot('group_id')
                     ->withTimestamps();
     }
+
+    public function galleries(): HasMany
+    {
+        return $this->hasMany(Gallery::class);
+    }
 }

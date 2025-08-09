@@ -12,7 +12,7 @@ class Gallery extends Model
     protected $fillable = [
         'image_url',
         'uploaded_by',
-        'description',
+        'tournament_id',
     ];
 
     /**
@@ -21,5 +21,10 @@ class Gallery extends Model
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function tournament()
+    {
+        return $this->belongsTo(Tournament::class);
     }
 }

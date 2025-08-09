@@ -26,6 +26,8 @@ class NotificationResource extends Resource
     protected static ?string $model = Notification::class;
     protected static ?string $navigationLabel = '通知管理';
     protected static ?string $navigationGroup = 'お知らせ管理';
+    protected static ?string $navigationIcon = 'heroicon-o-bell-alert';
+
      // 一覧画面のタイトル
     public static function getPluralLabel(): string
     {
@@ -36,7 +38,6 @@ class NotificationResource extends Resource
     {
         return '通知';
     }
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
     public static function form(Form $form): Form
     {
