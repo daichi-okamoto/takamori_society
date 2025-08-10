@@ -14,9 +14,21 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Takamori Society',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.green, useMaterial3: true),
-      darkTheme: ThemeData.dark(useMaterial3: true),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.system, // 端末の明暗に追随
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFFF7A00), // オレンジ
+          brightness: Brightness.light,
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFFF7A00), // オレンジ
+          brightness: Brightness.light,
+        ),
+      ),
       initialRoute: '/login',
       routes: {
         '/login': (_) => const LoginPage(),
