@@ -1,42 +1,42 @@
-# 1) ビルド用（Composerで依存解決）
+# ── 1) Composer で vendor を用意（ビルド段階）
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --prefer-dist --no-progress --no-interaction
+RUN composer install --no-dev --prefer-dist --no-progress --no-interaction \
+    --ignore-platform-req=ext-intl
 
-# 2) ランタイム（FrankenPHP は PHP + Caddy = 高速/省メモリ）
+# ── 2) 実行環境：FrankenPHP（PHP + Caddy）
 FROM dunglas/frankenphp:latest
 
-# 必要拡張（pgsql, pdo_pgsql, gd, zip など。MySQLなら pdo_mysql に変更）
+# 必要PHP拡張をインストール
+# もし MySQL を使うなら pdo_pgsql を pdo_mysql に変更してください
 RUN install-php-extensions \
     gd intl pcntl bcmath exif opcache zip \
     pdo_pgsql
 
-# 作業ディレクトリ
 WORKDIR /app
 
 # アプリ本体
 COPY . /app
-
-# ベンダー(ビルド済み) を上書きコピー
+# vendor を上書きコピー
 COPY --from=vendor /app/vendor /app/vendor
 
 # 権限（storage と bootstrap/cache）
 RUN addgroup --system laravel && adduser --system --ingroup laravel laravel \
  && chown -R laravel:laravel /app/storage /app/bootstrap/cache
-
 USER laravel
 
-# 本番キャッシュ（存在しなくてもOK）
+# キャッシュ（環境変数が未設定でも失敗しないように || true）
 RUN php artisan config:cache || true \
  && php artisan route:cache || true \
  && php artisan view:cache  || true
 
-# Laravel の公開ディレクトリを root に設定
+# Koyeb が割り当てる $PORT で待ち受け
 ENV SERVER_NAME=:${PORT:-3000}
+# FrankenPHP にエントリポイント（public/index.php）を指定
 ENV FRANKENPHP_CONFIG="worker ./public/index.php"
 
-# 起動時にストレージリンクとマイグレーション実行（安全に）
+# 起動時：storage:link と migrate 実行 → Webサーバ起動
 CMD php artisan storage:link || true \
  && php artisan migrate --force || true \
  && frankenphp run --config /etc/caddy/Caddyfile
