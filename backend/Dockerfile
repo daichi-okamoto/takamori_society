@@ -50,7 +50,7 @@ WORKDIR /app
 COPY --from=vendor /app/vendor /app/vendor
 # アプリ本体
 COPY . /app
-# Vite の成果物を配置（Filament などの CSS/JS）
+# Vite の成果物を配置（アプリの CSS/JS）
 COPY --from=assets /app/public/build /app/public/build
 
 # Caddy のデータディレクトリ（pki の権限エラー回避）
@@ -67,7 +67,7 @@ RUN mkdir -p /app/storage /app/bootstrap/cache /app/public \
 # 実行ユーザー
 USER www-data
 
-# ⚠️ ビルド時にアプリキャッシュは作らない（古い .env を焼き込まない）
+# ビルド時にアプリキャッシュは作らない（古い .env を焼き込まない）
 # RUN php artisan package:discover || true
 # RUN php artisan config:cache    || true
 # RUN php artisan route:cache     || true
@@ -76,11 +76,11 @@ USER www-data
 # Koyeb の $PORT で待受け（Serviceの公開ポートは 8000 でもOK。Koyeb→PORTに転送される）
 ENV SERVER_NAME=:${PORT:-3000}
 
-# worker モードは使わない（通常のPHPで十分）
+# worker モードは使わない
 # ENV FRANKENPHP_CONFIG="worker ./public/index.php"
 
-# 起動：キャッシュ掃除→（必要なら migrate は手動で）→サーバ起動
-# 既にDBが整っているなら migrate は省略可。自動実行したいなら `&& php artisan migrate --force || true \` を挟む
+# 起動：キャッシュ掃除 → Filament のアセット出力 → サーバ起動
+# ※ filament:assets は v3 では --force オプション無し
 CMD php artisan optimize:clear >/dev/null 2>&1 || true \
- && php artisan filament:assets --force || true \
+ && php artisan filament:assets || true \
  && frankenphp run --config /etc/caddy/Caddyfile
