@@ -1,8 +1,9 @@
 # ─────────────────────────────────────────────
-# 1) vendor ステージ（そのままでOK / だいちの設定を活かす）
+# 1) vendor ステージ（composer だけの軽量ステージ）
 # ─────────────────────────────────────────────
 FROM composer:2 AS vendor
 WORKDIR /app
+
 COPY composer.json composer.lock ./
 RUN composer install \
     --no-dev --prefer-dist --no-progress --no-interaction \
@@ -15,43 +16,46 @@ RUN composer install \
 # ─────────────────────────────────────────────
 FROM dunglas/frankenphp:latest
 
-# 必要拡張
-RUN install-php-extensions gd intl pcntl bcmath exif opcache zip pdo_pgsql
+# 必要な PHP 拡張
+RUN install-php-extensions \
+    gd intl pcntl bcmath exif opcache zip \
+    pdo_pgsql
 
 WORKDIR /app
 
-# 先に vendor
+# 先に vendor を配置（キャッシュ効く）
 COPY --from=vendor /app/vendor /app/vendor
-# アプリ本体
+# アプリ本体をコピー
 COPY . /app
 
 # ここは root のまま
-# Caddy が使うデータディレクトリを用意 & 権限付与（どちらか/両方でOK）
+# Caddy のデータディレクトリを用意（pki の権限エラー回避）
 RUN mkdir -p /data/caddy && chown -R www-data:www-data /data
-# あるいは Caddy のデータ場所をアプリ配下に変更したい場合は環境変数で
+
+# Caddy/FrankenPHP のデータをアプリ配下に寄せる（任意。root権限不要化に寄与）
 ENV XDG_DATA_HOME=/app/storage
 ENV XDG_CONFIG_HOME=/app/storage
 
 # Laravel 用の権限
-RUN mkdir -p /app/storage /app/bootstrap/cache \
+RUN mkdir -p /app/storage /app/bootstrap/cache /app/public \
  && chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/public
 
 # 実行ユーザー
 USER www-data
 
-# ビルド時の軽い最適化（失敗しても継続）
-RUN php artisan package:discover || true \
- && php artisan config:cache || true \
- && php artisan route:cache || true \
- && php artisan view:cache  || true
+# ⚠️ ビルド時に config:cache しない（古い .env を焼き込むため）
+# RUN php artisan package:discover || true
+# RUN php artisan config:cache || true
+# RUN php artisan route:cache  || true
+# RUN php artisan view:cache   || true
 
-# Koyeb の PORT を使う
+# Koyeb の $PORT で待受け
 ENV SERVER_NAME=:${PORT:-3000}
-# FrankenPHP のエントリポイント
-ENV FRANKENPHP_CONFIG="worker ./public/index.php"
 
-# 起動コマンド
-# ※ storage:link は R2 運用なら不要なので削除
-# ※ migrate は失敗しても起動は続行（DB準備の前後で再起動されるため）
-CMD php artisan migrate --force || true \
+# ⚠️ Laravelの index.php は worker モード不要。指定しない。
+# ENV FRANKENPHP_CONFIG="worker ./public/index.php"  ←削除
+
+# 起動：古いキャッシュを消してから migrate、最後にサーバ起動
+CMD php artisan optimize:clear >/dev/null 2>&1 || true \
+ && php artisan migrate --force || true \
  && frankenphp run --config /etc/caddy/Caddyfile
