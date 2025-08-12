@@ -1,11 +1,9 @@
 # ─────────────────────────────────────────────
-# 1) vendor を用意（composer だけの軽量ステージ）
+# 1) vendor ステージ（そのままでOK / だいちの設定を活かす）
 # ─────────────────────────────────────────────
 FROM composer:2 AS vendor
 WORKDIR /app
-
 COPY composer.json composer.lock ./
-# ← ここで --no-scripts を付けて、artisan 不在でも失敗しないようにする
 RUN composer install \
     --no-dev --prefer-dist --no-progress --no-interaction \
     --no-scripts \
@@ -17,37 +15,43 @@ RUN composer install \
 # ─────────────────────────────────────────────
 FROM dunglas/frankenphp:latest
 
-# 必要な PHP 拡張をインストール
-# ※ MySQL を使う場合は pdo_pgsql を pdo_mysql に変更
-RUN install-php-extensions \
-    gd intl pcntl bcmath exif opcache zip \
-    pdo_pgsql
+# 必要拡張
+RUN install-php-extensions gd intl pcntl bcmath exif opcache zip pdo_pgsql
 
 WORKDIR /app
 
-# 先に vendor を配置（キャッシュ効く）
+# 先に vendor
 COPY --from=vendor /app/vendor /app/vendor
-# アプリ本体をコピー（artisan を含む）
+# アプリ本体
 COPY . /app
 
-# 権限調整（storage と bootstrap/cache）
-RUN addgroup --system laravel && adduser --system --ingroup laravel laravel \
- && mkdir -p /app/storage /app/bootstrap/cache \
- && chown -R laravel:laravel /app/storage /app/bootstrap/cache
-USER laravel
+# ここは root のまま
+# Caddy が使うデータディレクトリを用意 & 権限付与（どちらか/両方でOK）
+RUN mkdir -p /data/caddy && chown -R www-data:www-data /data
+# あるいは Caddy のデータ場所をアプリ配下に変更したい場合は環境変数で
+ENV XDG_DATA_HOME=/app/storage
+ENV XDG_CONFIG_HOME=/app/storage
 
-# ビルド時の最小最適化（環境未設定でも落ちないように || true）
+# Laravel 用の権限
+RUN mkdir -p /app/storage /app/bootstrap/cache \
+ && chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/public
+
+# 実行ユーザー
+USER www-data
+
+# ビルド時の軽い最適化（失敗しても継続）
 RUN php artisan package:discover || true \
  && php artisan config:cache || true \
  && php artisan route:cache || true \
  && php artisan view:cache  || true
 
-# Koyeb の $PORT で待受け（ローカルは 3000）
+# Koyeb の PORT を使う
 ENV SERVER_NAME=:${PORT:-3000}
-# FrankenPHP のエントリポイント（public/index.php）
+# FrankenPHP のエントリポイント
 ENV FRANKENPHP_CONFIG="worker ./public/index.php"
 
-# 起動：storage:link / migrate 実行後に Web サーバ起動
-CMD php artisan storage:link || true \
- && php artisan migrate --force || true \
+# 起動コマンド
+# ※ storage:link は R2 運用なら不要なので削除
+# ※ migrate は失敗しても起動は続行（DB準備の前後で再起動されるため）
+CMD php artisan migrate --force || true \
  && frankenphp run --config /etc/caddy/Caddyfile
