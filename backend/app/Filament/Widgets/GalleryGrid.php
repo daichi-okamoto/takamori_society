@@ -28,7 +28,7 @@ class GalleryGrid extends Widget
     /** 現在位置（$lightboxIds のインデックス） */
     public int $lightboxIndex = 0;
 
-    // 一覧のベースクエリ（フィルタ反映）
+    // 一覧クエリ：必要列をちゃんと取得
     protected function galleriesQuery(): Builder
     {
         return Gallery::query()
@@ -90,25 +90,13 @@ class GalleryGrid extends Widget
         $this->lightboxIndex = $index;
 
         $id = $this->lightboxIds[$index] ?? null;
-        if (!$id) {
-            return;
-        }
+        if (!$id) return;
 
         $g = Gallery::find($id);
-        if (!$g) {
-            return;
-        }
+        if (!$g) return;
 
-        // 旧JSON形式 ["galleries/..."] にも対応
-        $path = $g->image_url;
-        if (is_string($path) && str_starts_with($path, '[')) {
-            $decoded = json_decode($path, true);
-            if (is_array($decoded)) {
-                $path = $decoded[0] ?? '';
-            }
-        }
-
-        $this->lightboxSrc = $path ? asset('storage/' . $path) : null;
+        // R2対応：モデルのアクセサURLを使う
+        $this->lightboxSrc = $g->url;           // ← ここが重要
         $this->lightboxAlt = 'gallery-' . $g->id;
     }
 
@@ -118,8 +106,10 @@ class GalleryGrid extends Widget
         return [
             'galleries' => $this->galleriesQuery()
                 ->limit(48)
-                ->get(['id', 'image_url', 'tournament_id', 'uploaded_by', 'created_at']),
-            'tournaments' => Tournament::orderBy('name')->pluck('name', 'id'),
+                // → 取得列絞り込みをやめる or 必要列を含める
+                // ->get(['id', 'tournament_id', 'uploaded_by', 'created_at', 'disk', 'path', 'visibility'])
+                ->get(),
+            'tournaments' => \App\Models\Tournament::orderBy('name')->pluck('name', 'id'),
         ];
     }
 

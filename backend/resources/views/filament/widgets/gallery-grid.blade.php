@@ -1,8 +1,9 @@
+{{-- resources/views/filament/widgets/gallery-grid.blade.php --}}
 <x-filament::section>
     <x-slot name="heading">ギャラリー（画像のみ）</x-slot>
 
     {{-- 大会フィルタ --}}
-    <div class=" flex items-center gap-2">
+    <div class="flex items-center gap-2">
         <label class="text-sm text-gray-400">大会フィルタ:</label>
         <select
             class="fi-input block rounded-md border-gray-300 text-sm
@@ -18,7 +19,7 @@
             @endforeach
         </select>
 
-        @if($tournamentFilter)
+        @if ($tournamentFilter)
             <button
                 type="button"
                 class="px-2 py-1 text-xs rounded-md border bg-white hover:bg-gray-50 text-gray-400
@@ -27,40 +28,45 @@
             >クリア</button>
         @endif
     </div>
+
     <div class="h-10"></div>
+
     {{-- グリッド --}}
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
         @forelse ($galleries as $gallery)
             @php
-                $path = $gallery->image_url;
-                if (is_string($path) && str_starts_with($path, '[')) {
-                    $decoded = json_decode($path, true);
-                    if (is_array($decoded)) $path = $decoded[0] ?? '';
-                }
-                $full = $path ? asset('storage/' . $path) : null;
+                $url = $gallery->url; // ★ R2対応：モデルのアクセサを使用
             @endphp
 
-            @if ($full)
+            @if ($url)
                 <div class="relative group" wire:key="gallery-{{ $gallery->id }}">
-                    <button type="button"
+                    <button
+                        type="button"
                         class="block w-full"
-                        wire:click="openLightboxById({{ $gallery->id }})">
+                        wire:click="openLightboxById({{ $gallery->id }})"
+                        title="クリックで拡大"
+                    >
                         <img
-                            src="{{ $full }}"
+                            src="{{ $url }}"
                             alt="gallery-{{ $gallery->id }}"
                             loading="lazy"
                             class="aspect-square w-full object-cover rounded-xl border border-gray-200 group-hover:opacity-90 transition"
+                            onerror="this.style.display='none'"
                         >
                     </button>
 
-                    <a href="{{ \App\Filament\Resources\GalleryResource::getUrl('edit', ['record' => $gallery]) }}"
-                       class="absolute top-2 right-2 text-xs px-2 py-1 rounded-md bg-white/90 border border-gray-200 shadow-sm opacity-0 group-hover:opacity-100 transition">
+                    <a
+                        href="{{ \App\Filament\Resources\GalleryResource::getUrl('edit', ['record' => $gallery]) }}"
+                        class="absolute top-2 right-2 text-xs px-2 py-1 rounded-md bg-white/90 border border-gray-200 shadow-sm opacity-0 group-hover:opacity-100 transition"
+                    >
                         編集
                     </a>
                 </div>
             @endif
         @empty
-            <p class="text-sm text-gray-500">該当する画像がありません。</p>
+            <div class="col-span-full text-center text-sm text-gray-500 py-8">
+                該当する画像がありません。
+            </div>
         @endforelse
     </div>
 
@@ -118,7 +124,10 @@
         </div>
 
         <x-slot name="footerActions">
-            <x-filament::button color="gray" x-on:click="$dispatch('close-modal', { id: 'galleryLightbox' })">閉じる</x-filament::button>
+            <x-filament::button
+                color="gray"
+                x-on:click="$dispatch('close-modal', { id: 'galleryLightbox' })"
+            >閉じる</x-filament::button>
         </x-slot>
     </x-filament::modal>
 </x-filament::section>
