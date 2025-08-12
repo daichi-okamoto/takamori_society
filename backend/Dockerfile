@@ -12,6 +12,29 @@ RUN composer install \
  && rm -rf /root/.composer/cache
 
 # ─────────────────────────────────────────────
+# 1.5) assets ステージ（Vite で CSS/JS を本番ビルド）
+# ─────────────────────────────────────────────
+FROM node:20-alpine AS assets
+WORKDIR /app
+
+# パッケージマネージャに応じてロックファイルを拾う
+COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
+
+# 依存をインストール（ロックファイルがあれば厳密インストール）
+RUN if [ -f package-lock.json ]; then npm ci; \
+    elif [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
+    elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm i --frozen-lockfile; \
+    else npm i; fi
+
+# ビルドに必要なファイルだけコピー（無駄なキャッシュを避ける）
+COPY resources ./resources
+COPY vite.config.* ./
+COPY tailwind.config.* postcss.config.* ./
+
+# 本番ビルド（public/build に成果物ができる）
+RUN npm run build
+
+# ─────────────────────────────────────────────
 # 2) 実行環境：FrankenPHP（PHP + Caddy）
 # ─────────────────────────────────────────────
 FROM dunglas/frankenphp:latest
@@ -23,10 +46,12 @@ RUN install-php-extensions \
 
 WORKDIR /app
 
-# 先に vendor を配置（キャッシュ効く）
+# 先に vendor（キャッシュが効く）
 COPY --from=vendor /app/vendor /app/vendor
-# アプリ本体をコピー
+# アプリ本体
 COPY . /app
+# Vite の成果物を配置（Filament などの CSS/JS）
+COPY --from=assets /app/public/build /app/public/build
 
 # Caddy のデータディレクトリ（pki の権限エラー回避）
 RUN mkdir -p /data/caddy && chown -R www-data:www-data /data
@@ -42,19 +67,19 @@ RUN mkdir -p /app/storage /app/bootstrap/cache /app/public \
 # 実行ユーザー
 USER www-data
 
-# ⚠️ ビルド時キャッシュは作らない（古い .env を焼き込まないため）
+# ⚠️ ビルド時にアプリキャッシュは作らない（古い .env を焼き込まない）
 # RUN php artisan package:discover || true
 # RUN php artisan config:cache    || true
 # RUN php artisan route:cache     || true
 # RUN php artisan view:cache      || true
 
-# Koyeb の $PORT で待受け
+# Koyeb の $PORT で待受け（Serviceの公開ポートは 8000 でもOK。Koyeb→PORTに転送される）
 ENV SERVER_NAME=:${PORT:-3000}
 
-# ⚠️ worker モードは使わない（通常のPHP実行でOK）
+# worker モードは使わない（通常のPHPで十分）
 # ENV FRANKENPHP_CONFIG="worker ./public/index.php"
 
-# 起動コマンド：まずキャッシュを掃除してからサーバ起動
-# ※ マイグレーションは手動で 1 回だけ実行してください（デプロイ後に）
+# 起動：キャッシュ掃除→（必要なら migrate は手動で）→サーバ起動
+# 既にDBが整っているなら migrate は省略可。自動実行したいなら `&& php artisan migrate --force || true \` を挟む
 CMD php artisan optimize:clear >/dev/null 2>&1 || true \
  && frankenphp run --config /etc/caddy/Caddyfile
