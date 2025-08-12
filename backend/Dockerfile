@@ -82,4 +82,5 @@ ENV SERVER_NAME=:${PORT:-3000}
 # 起動：キャッシュ掃除→（必要なら migrate は手動で）→サーバ起動
 # 既にDBが整っているなら migrate は省略可。自動実行したいなら `&& php artisan migrate --force || true \` を挟む
 CMD php artisan optimize:clear >/dev/null 2>&1 || true \
+ && php artisan filament:assets --force || true \
  && frankenphp run --config /etc/caddy/Caddyfile

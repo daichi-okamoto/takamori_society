@@ -98,4 +98,5 @@ return [
 
     'system_route_prefix' => 'filament',
     'locale' => 'ja',
+    'assets_path' => null,
 ];
