@@ -27,6 +27,8 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->registration()   // ← これを追加（標準の登録ページが /admin/register に生えます）
+            ->passwordReset()
             ->colors([
                 'primary' => Color::Amber,
             ])
