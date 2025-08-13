@@ -84,3 +84,7 @@ ENV SERVER_NAME=:${PORT:-3000}
 CMD php artisan optimize:clear >/dev/null 2>&1 || true \
  && php artisan filament:assets || true \
  && frankenphp run --config /etc/caddy/Caddyfile
+
+# 実行権限付与（Dockerfile内）
+COPY docker/entrypoint.sh /app/docker/entrypoint.sh
+RUN chmod +x /app/docker/entrypoint.sh
