@@ -96,6 +96,9 @@ return [
             'search_path' => 'public',
             'sslmode' => 'prefer',
             'schema' => env('DB_SCHEMA', 'public'),   // ← これを追加
+            'options' => extension_loaded('pdo_pgsql') ? array_filter([
+                PDO::ATTR_EMULATE_PREPARES => true, // ← これを追加
+            ]) : [],
         ],
 
         'sqlsrv' => [
