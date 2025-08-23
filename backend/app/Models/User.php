@@ -7,7 +7,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\FcmToken;
-
 // ↓ 追加
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -36,5 +35,10 @@ class User extends Authenticatable implements FilamentUser
     public function fcmTokens()
     {
         return $this->hasMany(FcmToken::class);
+    }
+
+    public function player()
+    {
+        return $this->hasOne(\App\Models\Player::class);
     }
 }

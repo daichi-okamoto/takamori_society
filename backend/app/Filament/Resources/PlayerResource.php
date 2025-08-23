@@ -9,6 +9,8 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
 
 class PlayerResource extends Resource
 {
@@ -18,27 +20,47 @@ class PlayerResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            // --- ユーザーテーブル更新 ---
-            Forms\Components\TextInput::make('user.name')
-                ->label('名前')
-                ->required()
-                ->afterStateHydrated(fn ($component, $record) => 
-                    $component->state($record->user?->name)
-                )
-                ->dehydrated(true),
 
-            Forms\Components\TextInput::make('user.kana')
-                ->label('フリガナ')
-                ->required()
-                ->afterStateHydrated(fn ($component, $record) => 
-                    $component->state($record->user?->kana)
-                )
-                ->dehydrated(true),
+            // ▼ User モデルへ保存（relationship('user')）
+            Forms\Components\Group::make([
+                Forms\Components\TextInput::make('name')
+                    ->label('名前')
+                    ->required()
+                    ->maxLength(255),
 
-            // --- Playerテーブル更新 ---
+                Forms\Components\TextInput::make('kana')
+                    ->label('フリガナ')
+                    ->required()
+                    ->maxLength(255),
+
+                Forms\Components\TextInput::make('email')
+                    ->label('メールアドレス')
+                    ->email()
+                    ->required()
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
+
+                // ← 表示しない（Hidden）でパスワード自動生成・ハッシュ保存
+                Forms\Components\Hidden::make('password')
+                    ->dehydrateStateUsing(fn () => Hash::make(Str::random(24)))
+                    ->dehydrated(true),
+
+                // 役割も Hidden で自動
+                Forms\Components\Hidden::make('role')
+                    ->default('player')
+                    ->dehydrated(true),
+
+                // ※メール確認済みにしたいなら（不要なら消してください）
+                Forms\Components\Hidden::make('email_verified_at')
+                    ->default(fn () => now())
+                    ->dehydrated(true),
+            ])->relationship('user'),
+
+            // ▼ Player 側
             Forms\Components\TextInput::make('address')
                 ->label('住所')
-                ->required(),
+                ->required()
+                ->maxLength(255),
 
             Forms\Components\DatePicker::make('date_of_birth')
                 ->label('生年月日')
@@ -56,14 +78,11 @@ class PlayerResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('user.name')->label('名前'),
-                Tables\Columns\TextColumn::make('user.kana')->label('フリガナ'),
-                Tables\Columns\TextColumn::make('address')->label('住所'),
+                Tables\Columns\TextColumn::make('user.name')->label('名前')->searchable(),
+                Tables\Columns\TextColumn::make('user.kana')->label('フリガナ')->searchable(),
+                Tables\Columns\TextColumn::make('address')->label('住所')->limit(30),
                 Tables\Columns\TextColumn::make('date_of_birth')->label('生年月日')->date(),
-                Tables\Columns\TextColumn::make('teams.name')
-                    ->label('所属チーム')
-                    ->badge()
-                    ->separator('、'),
+                Tables\Columns\TextColumn::make('teams.name')->label('所属チーム')->badge()->separator('、'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('teams')
@@ -72,18 +91,9 @@ class PlayerResource extends Resource
                     ->multiple(false),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->mutateFormDataUsing(function (array $data, $record) {
-                        // Userテーブルの更新
-                        $record->user->update([
-                            'name' => $data['user.name'] ?? $record->user->name,
-                            'kana' => $data['user.kana'] ?? $record->user->kana,
-                        ]);
-                        return $data;
-                    }),
+                Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
-
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -99,9 +109,9 @@ class PlayerResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPlayers::route('/'),
+            'index'  => Pages\ListPlayers::route('/'),
             'create' => Pages\CreatePlayer::route('/create'),
-            'edit' => Pages\EditPlayer::route('/{record}/edit'),
+            'edit'   => Pages\EditPlayer::route('/{record}/edit'),
         ];
     }
 
