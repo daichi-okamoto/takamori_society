@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\TeamResource\Pages;
 use App\Models\Team;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -12,6 +13,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
+use Illuminate\Support\Facades\DB;
 
 class TeamResource extends Resource
 {
@@ -20,30 +22,50 @@ class TeamResource extends Resource
 
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                TextInput::make('name')
-                    ->label('チーム名')
-                    ->required()
-                    ->maxLength(255),
+        return $form->schema([
+            Forms\Components\TextInput::make('name')
+                ->label('チーム名')
+                ->required()
+                ->maxLength(255),
 
-                // 代表者選択（usersテーブルのnameを表示）
-                Select::make('leader_id')
-                    ->label('代表者')
-                    ->relationship('leader', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->required()
-                    ->reactive()
-                    ->afterStateUpdated(fn ($state, callable $set) =>
-                        $set('leader_email', \App\Models\User::find($state)?->email)
-                    ),
-
-                TextInput::make('leader_email')
-                    ->label('メールアドレス')
-                    ->disabled()
-                    ->dehydrated(false)
-            ]);
+            // ★ このチームのメンバー(=players.user_id)だけから選ぶ
+            Select::make('leader_id')
+                ->label('代表者')
+                ->searchable()
+                ->preload()
+                ->nullable() // ← 解除できるように null 許可
+                ->helperText('このチームのメンバーの中から選択（ユーザー登録済みの選手のみ）')
+                ->options(function ($record) {
+                    if (! $record?->id) {
+                        return []; // 新規作成時はメンバーがまだいない想定
+                    }
+                    return User::query()
+                        ->whereIn('id', function ($q) use ($record) {
+                            $q->from('players')
+                            ->join('player_team', 'player_team.player_id', '=', 'players.id')
+                            ->where('player_team.team_id', $record->id)
+                            ->whereNotNull('players.user_id')
+                            ->select('players.user_id');
+                        })
+                        ->orderBy('name')
+                        ->pluck('name', 'id');
+                })
+                // バリデーション：メンバー以外は弾く（サーバー側で二重防御）
+                ->rules([
+                    function ($attribute, $value, $fail) use ($form) {
+                        $team = $form->getModelInstance(); // Team レコード
+                        if ($value === null) return; // 解除はOK
+                        $valid = DB::table('players')
+                            ->join('player_team', 'player_team.player_id', '=', 'players.id')
+                            ->where('player_team.team_id', $team->id)
+                            ->where('players.user_id', $value)
+                            ->exists();
+                        if (! $valid) {
+                            $fail('選択したユーザーはこのチームのメンバーではありません。');
+                        }
+                    }
+                ]),
+        ]);
     }
 
     public static function table(Table $table): Table

@@ -33,8 +33,8 @@ class Team extends Model
     public function players()
     {
         return $this->belongsToMany(Player::class)
-                    ->withPivot('joined_at', 'left_at')
-                    ->withTimestamps();
+            ->withPivot(['status', 'requested_at', 'approved_at', 'approved_by', 'joined_at', 'left_at'])
+            ->withTimestamps();
     }
 
     public function ranking()

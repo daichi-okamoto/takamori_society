@@ -11,9 +11,11 @@ class Player extends Model
 
     protected $fillable = [
         'user_id',
+        'name',
+        'kana',
+        'phone',
         'address',
         'date_of_birth',
-        'phone',
     ];
 
     /**
@@ -22,7 +24,7 @@ class Player extends Model
     public function teams()
     {
         return $this->belongsToMany(Team::class)
-            ->withPivot('joined_at', 'left_at')
+            ->withPivot(['status', 'requested_at', 'approved_at', 'approved_by', 'joined_at', 'left_at'])
             ->withTimestamps();
     }
     /**
