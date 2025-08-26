@@ -28,17 +28,16 @@ class TeamResource extends Resource
                 ->required()
                 ->maxLength(255),
 
-            // ★ このチームのメンバー(=players.user_id)だけから選ぶ
+            // 代表者は編集時のみ表示（新規時は非表示）
             Select::make('leader_id')
                 ->label('代表者')
                 ->searchable()
                 ->preload()
-                ->nullable() // ← 解除できるように null 許可
+                ->nullable()
+                ->visibleOn('edit') // ★ 作成時は非表示
                 ->helperText('このチームのメンバーの中から選択（ユーザー登録済みの選手のみ）')
                 ->options(function ($record) {
-                    if (! $record?->id) {
-                        return []; // 新規作成時はメンバーがまだいない想定
-                    }
+                    if (! $record?->id) return [];
                     return User::query()
                         ->whereIn('id', function ($q) use ($record) {
                             $q->from('players')
@@ -49,22 +48,8 @@ class TeamResource extends Resource
                         })
                         ->orderBy('name')
                         ->pluck('name', 'id');
-                })
-                // バリデーション：メンバー以外は弾く（サーバー側で二重防御）
-                ->rules([
-                    function ($attribute, $value, $fail) use ($form) {
-                        $team = $form->getModelInstance(); // Team レコード
-                        if ($value === null) return; // 解除はOK
-                        $valid = DB::table('players')
-                            ->join('player_team', 'player_team.player_id', '=', 'players.id')
-                            ->where('player_team.team_id', $team->id)
-                            ->where('players.user_id', $value)
-                            ->exists();
-                        if (! $valid) {
-                            $fail('選択したユーザーはこのチームのメンバーではありません。');
-                        }
-                    }
-                ]),
+                }),
+                // ※ ここにクロージャrulesは付けない（新規時に解決できず落ちるため）
         ]);
     }
 
@@ -86,6 +71,10 @@ class TeamResource extends Resource
                 // 連絡先 (メールアドレス) を表示
                 TextColumn::make('leader.email')
                     ->label('連絡先')
+                    ->searchable(),
+                
+                TextColumn::make('leader.phone')
+                    ->label('電話番号')
                     ->searchable(),
             ])
             ->filters([

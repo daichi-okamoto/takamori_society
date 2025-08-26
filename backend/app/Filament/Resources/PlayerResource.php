@@ -98,6 +98,7 @@ public static function table(Table $table): Table
                 }),
             Tables\Columns\TextColumn::make('address')->label('住所')->limit(30),
             Tables\Columns\TextColumn::make('date_of_birth')->label('生年月日')->date('Y/m/d'),
+            Tables\Columns\TextColumn::make('phone')->label('電話番号'),
             Tables\Columns\TextColumn::make('teams.name')->label('所属チーム')->badge()->separator('、'),
             // ★ 代表者フラグ（○/×）
             Tables\Columns\IconColumn::make('is_leader')
