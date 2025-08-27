@@ -64,41 +64,63 @@ class GalleryResource extends Resource
                     ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, callable $get) {
                         $disk = 'r2';
                         $dir  = "galleries/{$get('tournament_id')}";
-                        $ext  = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-                        $name = now()->format('Ymd_His') . '_' . \Illuminate\Support\Str::random(8) . '.' . $ext;
 
-                        $maxSide = 2000;
-                        $quality = 85;
+                        try {
+                            $ext  = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+                            $name = now()->format('Ymd_His') . '_' . \Illuminate\Support\Str::random(8) . '.' . $ext;
 
-                        $img = \Intervention\Image\Laravel\Facades\Image::read($file->getRealPath())->scaleDown($maxSide);
+                            $maxSide = 2000;
+                            $quality = 85;
 
-                        switch ($ext) {
-                            case 'png':
-                                $binary = (string) $img->toPng();
-                                $mime = 'image/png';
-                                break;
-                            case 'webp':
-                                $binary = (string) $img->toWebp($quality);
-                                $mime = 'image/webp';
-                                break;
-                            case 'jpg':
-                            case 'jpeg':
-                            default:
-                                $binary = (string) $img->toJpeg($quality);
-                                $mime = 'image/jpeg';
-                                break;
+                            // ① Intervention Image 読み込み～変換
+                            $img = \Intervention\Image\Laravel\Facades\Image::read($file->getRealPath())->scaleDown($maxSide);
+
+                            switch ($ext) {
+                                case 'png':
+                                    $binary = (string) $img->toPng();
+                                    $mime = 'image/png';
+                                    break;
+                                case 'webp':
+                                    $binary = (string) $img->toWebp($quality);
+                                    $mime = 'image/webp';
+                                    break;
+                                case 'jpg':
+                                case 'jpeg':
+                                default:
+                                    $binary = (string) $img->toJpeg($quality);
+                                    $mime = 'image/jpeg';
+                                    break;
+                            }
+
+                            $path = "$dir/$name";
+
+                            // ② R2 へ保存
+                            \Illuminate\Support\Facades\Storage::disk($disk)->put($path, $binary, [
+                                'visibility'  => 'public',
+                                'ContentType' => $mime,
+                            ]);
+
+                            // ③ すぐに HEAD 叩いて到達性を検証（S3 API 的に OK か）
+                            if (!\Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+                                \Log::error('[Gallery Upload] put OK but exists() false', compact('path','mime'));
+                            } else {
+                                \Log::debug('[Gallery Upload] saved', compact('path','mime'));
+                            }
+
+                            return $path;
+
+                        } catch (\Throwable $e) {
+                            \Log::error('[Gallery Upload] failed', [
+                                'error' => $e->getMessage(),
+                                'trace' => $e->getTraceAsString(),
+                                'ext'   => $file->getClientOriginalExtension(),
+                                'mime'  => $file->getMimeType(),
+                                'size'  => $file->getSize(),
+                            ]);
+                            // 画面は赤帯で良いので、そのまま再スロー
+                            throw $e;
                         }
-
-                        $path = "$dir/$name";
-
-                        \Illuminate\Support\Facades\Storage::disk($disk)->put($path, $binary, [
-                            'visibility'  => 'public',
-                            'ContentType' => $mime,
-                        ]);
-
-                        return $path;
                     })
-
             ]),
         ]);
     }
