@@ -22,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
     {
         if (app()->environment('production')) {
             URL::forceScheme('https');
+            URL::forceRootUrl(config('app.url'));  // ★ 追加：Host/Port を固定
         }
     }
 }

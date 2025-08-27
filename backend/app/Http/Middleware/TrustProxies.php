@@ -3,14 +3,14 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Middleware\TrustProxies as Middleware;
-use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Request;
 
 class TrustProxies extends Middleware
 {
-    // すべてのプロキシを信頼（Koyeb エッジ→アプリ間のプロキシを想定）
+    // すべてのプロキシを信頼
     protected $proxies = '*';
 
-    // X-Forwarded-* を使ってスキーム判定（AWS ELB 互換も含めておくと安全）
+    // X-Forwarded-* を信頼（ELB 互換も含めて網羅）
     protected $headers =
         Request::HEADER_X_FORWARDED_FOR |
         Request::HEADER_X_FORWARDED_HOST |
