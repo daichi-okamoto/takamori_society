@@ -12,8 +12,25 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // ★ web グループを明示（ここに auth を絶対入れない！）
+        $middleware->web(append: [
+            \Illuminate\Cookie\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ]);
+
+        // ★ CSRF は有効のまま、Livewire のアップロード系だけ例外化（401回避）
+        $middleware->validateCsrfTokens(except: [
+            'livewire/upload-file',
+            'livewire/preview-file/*',
+            'livewire/*', // 念のため広めに（問題なければ絞ってOK）
+        ]);
+
+        // プロキシは TrustProxies で設定済みなのでここでは何もしない
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
-    })->create();
+    })
+    ->create();
