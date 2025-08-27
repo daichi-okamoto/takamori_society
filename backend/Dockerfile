@@ -34,41 +34,42 @@ RUN npm run build
 # ─────────────────────────────────────────────
 FROM dunglas/frankenphp:latest
 
+# 必要拡張を導入（R2はS3互換なので ext-pdo_pgsql なども）
 RUN install-php-extensions \
     gd intl pcntl bcmath exif opcache zip \
     pdo_pgsql
 
 WORKDIR /app
 
-# 先に vendor（キャッシュ効率）
+# 先に vendor（キャッシュ効率UP）
 COPY --from=vendor /app/vendor /app/vendor
+
 # アプリ本体
 COPY . /app
-# Vite の成果物
+
+# Vite ビルド成果物
 COPY --from=assets /app/public/build /app/public/build
 
-# ★ entrypoint を root 権限で配置（パスはあなたのリポジトリに合わせて）
-#   例: リポジトリでは docker/entrypoint.sh にある想定
+# entrypoint を配置
 COPY --chmod=0755 docker/entrypoint.sh /app/docker/entrypoint.sh
-# ↑ BuildKit が使えるので --chmod=0755 で chmod は不要
 
-# Caddy のデータディレクトリ
+# Caddy のデータディレクトリを用意
 RUN mkdir -p /data/caddy && chown -R www-data:www-data /data
 
-# Caddy/FrankenPHP のデータをアプリ配下に寄せる（任意）
+# Caddy/FrankenPHP のワークディレクトリをアプリ配下へ（任意）
 ENV XDG_DATA_HOME=/app/storage
 ENV XDG_CONFIG_HOME=/app/storage
 
-# Laravel 用の権限
+# Laravel 用の初期ディレクトリと所有権（ビルド時点）
 RUN mkdir -p /app/storage /app/bootstrap/cache /app/public \
  && chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/public \
  && chown www-data:www-data /app/docker/entrypoint.sh
 
-# 実行ユーザーを最後に切替
+# 実行ユーザー
 USER www-data
 
-# Koyeb の $PORT で待受け
+# Koyeb の $PORT で待受（Caddy の SERVER_NAME 指定）
 ENV SERVER_NAME=:${PORT:-3000}
 
-# ★ 起動は entrypoint に委譲（重要！）
+# 起動は entrypoint に委譲
 CMD ["/app/docker/entrypoint.sh"]
