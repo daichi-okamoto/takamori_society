@@ -65,6 +65,11 @@ RUN mkdir -p /app/storage /app/bootstrap/cache /app/public \
  && chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/public \
  && chown www-data:www-data /app/docker/entrypoint.sh
 
+ # Dockerfile
+RUN mkdir -p /usr/local/etc/php/conf.d \
+ && printf "upload_max_filesize=20M\npost_max_size=21M\n" \
+    > /usr/local/etc/php/conf.d/uploads.ini
+
 # 実行ユーザー
 USER www-data
 
