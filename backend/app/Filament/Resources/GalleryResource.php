@@ -67,85 +67,103 @@ class GalleryResource extends Resource
                      * ローカルtmpがある場合は TemporaryUploadedFile として getRealPath() が使えます。
                      * どちらでも動くように分岐します。
                      */
-                    ->saveUploadedFileUsing(function (TemporaryUploadedFile|string $file, callable $get) {
-                        $disk = Storage::disk('r2');
-                        $dir  = 'galleries/' . $get('tournament_id');
+                ->saveUploadedFileUsing(function (\Livewire\Features\SupportFileUploads\TemporaryUploadedFile|string $file, callable $get) {
+                    $finalDisk = Storage::disk('r2');
 
-                        try {
-                            $ext = 'jpg';
-                            $binary = null;
+                    // Livewire の一時アップロード設定（デフォルト: disk=r2, dir=livewire-tmp）
+                    $tmpDiskName = config('livewire.temporary_file_upload.disk', 'r2');
+                    $tmpDir      = trim(config('livewire.temporary_file_upload.directory', 'livewire-tmp'), '/');
+                    $tmpDisk     = Storage::disk($tmpDiskName);
 
-                            if ($file instanceof TemporaryUploadedFile && is_file($file->getRealPath())) {
-                                // ローカル tmp 経由（Intervention はファイル/バイナリOK）
-                                $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-                                $image = Image::read($file->getRealPath())->scaleDown(width: 2000);
-                            } else {
-                                // R2 の一時キー（文字列）経由
-                                $tmpKey = is_string($file) ? $file : $file->getFilename(); // 念のため
-                                // まずメタが取れれば拡張子の判断に使う（なくても進む）
-                                try {
-                                    $mimeGuess = $disk->mimeType($tmpKey);
-                                    if (is_string($mimeGuess) && str_contains($mimeGuess, '/')) {
-                                        $ext = match (strtolower(explode('/', $mimeGuess)[1])) {
-                                            'png' => 'png',
-                                            'webp' => 'webp',
-                                            default => 'jpg',
-                                        };
-                                    }
-                                } catch (\Throwable $e) {
-                                    // 取れなくてもOK。デフォルト jpg で続行
+                    $dir  = 'galleries/' . $get('tournament_id');
+                    $ext  = 'jpg';
+                    $img  = null;
+
+                    try {
+                        if ($file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile && is_file($file->getRealPath())) {
+                            // ローカル tmp がある（開発環境等）
+                            $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+                            $img = \Intervention\Image\Laravel\Facades\Image::read($file->getRealPath())->scaleDown(width: 2000);
+                        } else {
+                            // 直アップロード（R2 上の一時キー）
+                            // まず“渡された値”から候補キーを組み立てる
+                            $key = is_string($file) ? $file : $file->getFilename();      // 多くの場合ファイル名のみ
+                            $candidates = [];
+
+                            // そのまま
+                            $candidates[] = ltrim($key, '/');
+                            // livewire-tmp を前置
+                            $candidates[] = $tmpDir . '/' . ltrim($key, '/');
+
+                            // 見つかったキーを採用
+                            $tmpKey = null;
+                            foreach ($candidates as $cand) {
+                                if ($tmpDisk->exists($cand)) { $tmpKey = $cand; break; }
+                            }
+
+                            if (!$tmpKey) {
+                                \Log::error('[Gallery Upload] temporary key not found on R2', ['tried' => $candidates]);
+                                throw new \RuntimeException('Temporary uploaded file cannot be found on R2.');
+                            }
+
+                            // MIME から出力拡張子の初期値を推定（失敗しても JPG にフォールバック）
+                            try {
+                                $mimeGuess = $tmpDisk->mimeType($tmpKey);
+                                if (is_string($mimeGuess) && str_contains($mimeGuess, '/')) {
+                                    $ext = match (strtolower(explode('/', $mimeGuess)[1])) {
+                                        'png'  => 'png',
+                                        'webp' => 'webp',
+                                        default => 'jpg',
+                                    };
                                 }
+                            } catch (\Throwable $e) { /* ignore */ }
 
-                                $binaryTmp = $disk->get($tmpKey); // バイナリ取得
-                                $image = Image::read($binaryTmp)->scaleDown(width: 2000);
-                            }
+                            // R2 から一時オブジェクトを取得 → Intervention で読み込み
+                            $binaryTmp = $tmpDisk->get($tmpKey);
+                            $img = \Intervention\Image\Laravel\Facades\Image::read($binaryTmp)->scaleDown(width: 2000);
 
-                            // 出力形式を選択（元拡張子に寄せるが、webp を優先したい場合はここで固定してもOK）
-                            $quality = 85;
-                            $mime = 'image/jpeg';
-                            switch ($ext) {
-                                case 'png':
-                                    $binary = (string) $image->toPng();
-                                    $mime = 'image/png';
-                                    break;
-                                case 'webp':
-                                    $binary = (string) $image->toWebp($quality);
-                                    $mime = 'image/webp';
-                                    break;
-                                case 'jpg':
-                                case 'jpeg':
-                                default:
-                                    $binary = (string) $image->toJpeg($quality);
-                                    $mime = 'image/jpeg';
-                                    $ext = 'jpg';
-                                    break;
-                            }
-
-                            $final = $dir . '/' . now()->format('Ymd_His') . '_' . Str::random(8) . '.' . $ext;
-
-                            // R2 に保存（公開想定）
-                            $disk->put($final, $binary, [
-                                'visibility'  => 'public',
-                                'ContentType' => $mime,
-                            ]);
-
-                            // 文字列キーで来ている場合は livewire-tmp を掃除（任意）
-                            if (isset($tmpKey) && is_string($tmpKey)) {
-                                $disk->delete($tmpKey);
-                            }
-
-                            // FileUpload の state にはこのパス（R2キー）を返す
-                            return $final;
-
-                        } catch (\Throwable $e) {
-                            \Log::error('[Gallery Upload] failed', [
-                                'error' => $e->getMessage(),
-                                'trace' => $e->getTraceAsString(),
-                                'size'  => $file instanceof TemporaryUploadedFile ? $file->getSize() : null,
-                            ]);
-                            throw $e;
+                            // 後始末（任意）
+                            try { $tmpDisk->delete($tmpKey); } catch (\Throwable $e) { /* ignore */ }
                         }
-                    }),
+
+                        // 出力（拡張子で分岐）
+                        $quality = 85;
+                        $mime = 'image/jpeg';
+                        switch ($ext) {
+                            case 'png':
+                                $binary = (string) $img->toPng();
+                                $mime = 'image/png';
+                                $ext  = 'png';
+                                break;
+                            case 'webp':
+                                $binary = (string) $img->toWebp($quality);
+                                $mime = 'image/webp';
+                                $ext  = 'webp';
+                                break;
+                            default:
+                                $binary = (string) $img->toJpeg($quality);
+                                $mime = 'image/jpeg';
+                                $ext  = 'jpg';
+                        }
+
+                        $final = $dir . '/' . now()->format('Ymd_His') . '_' . \Illuminate\Support\Str::random(8) . '.' . $ext;
+
+                        $finalDisk->put($final, $binary, [
+                            'visibility'  => 'public',
+                            'ContentType' => $mime,
+                        ]);
+
+                        return $final;
+
+                    } catch (\Throwable $e) {
+                        \Log::error('[Gallery Upload] failed', [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                            'size'  => $file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile ? $file->getSize() : null,
+                        ]);
+                        throw $e;
+                    }
+                }),
             ]),
         ]);
     }
