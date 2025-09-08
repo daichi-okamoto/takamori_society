@@ -10,13 +10,13 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-// 追加 use
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Intervention\Image\Laravel\Facades\Image;
@@ -51,81 +51,104 @@ class GalleryResource extends Resource
                     ->preload()
                     ->required(),
 
-                // 🔽 DBに保存しない一時フィールド。圧縮→R2保存して「保存済みパス」を返す
                 FileUpload::make('images')
                     ->label('画像（複数可）')
                     ->image()
                     ->multiple()
                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                     ->maxSize(8 * 1024) // 8MB
-                    ->required() // ← 任意（必須にするなら）
-                    ->helperText('最長辺 2000px・JPEG/WEBP 圧縮でR2へ保存します')
-                    // ここでは disk() を使わず、下の saveUploadedFileUsing で自前保存
-                    ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, callable $get) {
-                        $disk = 'r2';
-                        $dir  = "galleries/{$get('tournament_id')}";
+                    ->required()
+                    ->helperText('最長辺2000pxに縮小してWebP/JPEG/PNGでR2へ保存します')
+                    // R2 を使う前提。独自保存でも明示しておくと安心
+                    ->disk('r2')
+                    ->preserveFilenames(false)
+                    /**
+                     * Livewire(S3/R2直)の場合、$file が「livewire-tmp/...」という“R2キーの文字列”で渡って来ることがあります。
+                     * ローカルtmpがある場合は TemporaryUploadedFile として getRealPath() が使えます。
+                     * どちらでも動くように分岐します。
+                     */
+                    ->saveUploadedFileUsing(function (TemporaryUploadedFile|string $file, callable $get) {
+                        $disk = Storage::disk('r2');
+                        $dir  = 'galleries/' . $get('tournament_id');
 
                         try {
-                            $ext  = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-                            $name = now()->format('Ymd_His') . '_' . \Illuminate\Support\Str::random(8) . '.' . $ext;
+                            $ext = 'jpg';
+                            $binary = null;
 
-                            $maxSide = 2000;
+                            if ($file instanceof TemporaryUploadedFile && is_file($file->getRealPath())) {
+                                // ローカル tmp 経由（Intervention はファイル/バイナリOK）
+                                $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+                                $image = Image::read($file->getRealPath())->scaleDown(width: 2000);
+                            } else {
+                                // R2 の一時キー（文字列）経由
+                                $tmpKey = is_string($file) ? $file : $file->getFilename(); // 念のため
+                                // まずメタが取れれば拡張子の判断に使う（なくても進む）
+                                try {
+                                    $mimeGuess = $disk->mimeType($tmpKey);
+                                    if (is_string($mimeGuess) && str_contains($mimeGuess, '/')) {
+                                        $ext = match (strtolower(explode('/', $mimeGuess)[1])) {
+                                            'png' => 'png',
+                                            'webp' => 'webp',
+                                            default => 'jpg',
+                                        };
+                                    }
+                                } catch (\Throwable $e) {
+                                    // 取れなくてもOK。デフォルト jpg で続行
+                                }
+
+                                $binaryTmp = $disk->get($tmpKey); // バイナリ取得
+                                $image = Image::read($binaryTmp)->scaleDown(width: 2000);
+                            }
+
+                            // 出力形式を選択（元拡張子に寄せるが、webp を優先したい場合はここで固定してもOK）
                             $quality = 85;
-
-                            // ① Intervention Image 読み込み～変換
-                            $img = \Intervention\Image\Laravel\Facades\Image::read($file->getRealPath())->scaleDown($maxSide);
-
+                            $mime = 'image/jpeg';
                             switch ($ext) {
                                 case 'png':
-                                    $binary = (string) $img->toPng();
+                                    $binary = (string) $image->toPng();
                                     $mime = 'image/png';
                                     break;
                                 case 'webp':
-                                    $binary = (string) $img->toWebp($quality);
+                                    $binary = (string) $image->toWebp($quality);
                                     $mime = 'image/webp';
                                     break;
                                 case 'jpg':
                                 case 'jpeg':
                                 default:
-                                    $binary = (string) $img->toJpeg($quality);
+                                    $binary = (string) $image->toJpeg($quality);
                                     $mime = 'image/jpeg';
+                                    $ext = 'jpg';
                                     break;
                             }
 
-                            $path = "$dir/$name";
+                            $final = $dir . '/' . now()->format('Ymd_His') . '_' . Str::random(8) . '.' . $ext;
 
-                            // ② R2 へ保存
-                            \Illuminate\Support\Facades\Storage::disk($disk)->put($path, $binary, [
+                            // R2 に保存（公開想定）
+                            $disk->put($final, $binary, [
                                 'visibility'  => 'public',
                                 'ContentType' => $mime,
                             ]);
 
-                            // ③ すぐに HEAD 叩いて到達性を検証（S3 API 的に OK か）
-                            if (!\Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
-                                \Log::error('[Gallery Upload] put OK but exists() false', compact('path','mime'));
-                            } else {
-                                \Log::debug('[Gallery Upload] saved', compact('path','mime'));
+                            // 文字列キーで来ている場合は livewire-tmp を掃除（任意）
+                            if (isset($tmpKey) && is_string($tmpKey)) {
+                                $disk->delete($tmpKey);
                             }
 
-                            return $path;
+                            // FileUpload の state にはこのパス（R2キー）を返す
+                            return $final;
 
                         } catch (\Throwable $e) {
                             \Log::error('[Gallery Upload] failed', [
                                 'error' => $e->getMessage(),
                                 'trace' => $e->getTraceAsString(),
-                                'ext'   => $file->getClientOriginalExtension(),
-                                'mime'  => $file->getMimeType(),
-                                'size'  => $file->getSize(),
+                                'size'  => $file instanceof TemporaryUploadedFile ? $file->getSize() : null,
                             ]);
-                            // 画面は赤帯で良いので、そのまま再スロー
                             throw $e;
                         }
-                    })
+                    }),
             ]),
         ]);
     }
-
-// App\Filament\Resources\GalleryResource::table()
 
     public static function table(Table $table): Table
     {
@@ -133,8 +156,7 @@ class GalleryResource extends Resource
             ->columns([
                 Tables\Columns\ImageColumn::make('path')
                     ->label('画像')
-                    // レコードのURLアクセサを使って常にフルURLを返す
-                    ->getStateUsing(fn (Gallery $record) => $record->url)
+                    ->getStateUsing(fn (Gallery $record) => $record->url) // モデル側でURLアクセサを実装している想定
                     ->square()
                     ->size(84),
 
