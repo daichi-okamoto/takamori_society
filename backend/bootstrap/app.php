@@ -3,23 +3,36 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
-        commands: __DIR__.'/../routes/console.php',
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // 1) まず最初にプロキシを信頼（Cloudflare/Koyeb向け）
+        // ── Cloudflare / Koyeb 向け: X-Forwarded-* を信頼
+        // Symfony の定数はバージョンで差があるため、存在チェックして柔軟に組み立てる
+        $headers = \defined('\Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_ALL')
+            ? SymfonyRequest::HEADER_X_FORWARDED_ALL
+            : (
+                SymfonyRequest::HEADER_X_FORWARDED_FOR
+                | SymfonyRequest::HEADER_X_FORWARDED_HOST
+                | SymfonyRequest::HEADER_X_FORWARDED_PROTO
+                | SymfonyRequest::HEADER_X_FORWARDED_PORT
+                | (\defined('\Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PREFIX')
+                    ? SymfonyRequest::HEADER_X_FORWARDED_PREFIX
+                    : 0)
+            );
+
         $middleware->trustProxies(
-            at: '*',  // 特定IPを列挙してもOKだが、まずは '*' で
-            headers: Request::HEADER_X_FORWARDED_ALL
+            at: '*',
+            headers: $headers
         );
 
-        // 2) web グループ（現状のままでOK）
+        // web グループ（必要最低限）
         $middleware->web(append: [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
@@ -28,10 +41,13 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
-        // 3) ★CSRF 例外は外してOK（署名401には関係なし、セキュリティ的にも不要）
+        // CSRF 例外は不要（Livewire 署名 401 とは無関係）
         // $middleware->validateCsrfTokens(except: [
         //     'livewire/upload-file',
         //     'livewire/preview-file/*',
         // ]);
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        //
     })
     ->create();

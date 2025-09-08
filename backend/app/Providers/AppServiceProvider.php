@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,21 +21,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // 本番では https と APP_URL に固定して署名URLの不一致を防ぐ
         if (app()->isProduction()) {
-            // 署名URLを常に https & 実ホストで生成
             URL::forceScheme('https');
-            if (request()->hasHeader('host')) {
-                // ← ここがポイント：実際に来た Host をそのまま使う
-                URL::forceRootUrl('https://' . request()->getHttpHost());
-            }
+            // APP_URL（.envのAPP_URL）を絶対的な基準にする
+            URL::forceRootUrl(config('app.url'));
         }
 
-        // Livewire のルートには web ミドルウェアのみ
-        if (method_exists(\Livewire\Livewire::class, 'setUpdateRouteMiddleware')) {
-            \Livewire\Livewire::setUpdateRouteMiddleware(['web']);
+        // Livewire のルートには web ミドルウェアのみを適用
+        if (method_exists(Livewire::class, 'setUpdateRouteMiddleware')) {
+            Livewire::setUpdateRouteMiddleware(['web']);
         }
-        if (method_exists(\Livewire\Livewire::class, 'setFileUploadRouteMiddleware')) {
-            \Livewire\Livewire::setFileUploadRouteMiddleware(['web']);
+        if (method_exists(Livewire::class, 'setFileUploadRouteMiddleware')) {
+            Livewire::setFileUploadRouteMiddleware(['web']);
         }
     }
 }
