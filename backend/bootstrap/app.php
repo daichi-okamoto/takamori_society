@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,7 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // ★ web グループを明示（ここに auth を絶対入れない！）
+        // 1) まず最初にプロキシを信頼（Cloudflare/Koyeb向け）
+        $middleware->trustProxies(
+            at: '*',  // 特定IPを列挙してもOKだが、まずは '*' で
+            headers: Request::HEADER_X_FORWARDED_ALL
+        );
+
+        // 2) web グループ（現状のままでOK）
         $middleware->web(append: [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
@@ -21,16 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
-        // ★ CSRF は有効のまま、Livewire のアップロード系だけ例外化（401回避）
-        $middleware->validateCsrfTokens(except: [
-            'livewire/upload-file',
-            'livewire/preview-file/*',
-            'livewire/*', // 念のため広めに（問題なければ絞ってOK）
-        ]);
-
-        // プロキシは TrustProxies で設定済みなのでここでは何もしない
-    })
-    ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // 3) ★CSRF 例外は外してOK（署名401には関係なし、セキュリティ的にも不要）
+        // $middleware->validateCsrfTokens(except: [
+        //     'livewire/upload-file',
+        //     'livewire/preview-file/*',
+        // ]);
     })
     ->create();

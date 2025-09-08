@@ -21,16 +21,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (app()->environment('production')) {
+        if (app()->isProduction()) {
+            // 署名URLを常に https & 実ホストで生成
             URL::forceScheme('https');
-            URL::forceRootUrl(config('app.url'));  // ★ 追加：Host/Port を固定
+            if (request()->hasHeader('host')) {
+                // ← ここがポイント：実際に来た Host をそのまま使う
+                URL::forceRootUrl('https://' . request()->getHttpHost());
+            }
         }
-        // ★ Livewire のミドルウェアを明示的に固定（auth 等が混ざる事故を防ぐ）
-        if (method_exists(Livewire::class, 'setUpdateRouteMiddleware')) {
-            Livewire::setUpdateRouteMiddleware(['web']);
+
+        // Livewire のルートには web ミドルウェアのみ
+        if (method_exists(\Livewire\Livewire::class, 'setUpdateRouteMiddleware')) {
+            \Livewire\Livewire::setUpdateRouteMiddleware(['web']);
         }
-        if (method_exists(Livewire::class, 'setFileUploadRouteMiddleware')) {
-            Livewire::setFileUploadRouteMiddleware(['web']);
+        if (method_exists(\Livewire\Livewire::class, 'setFileUploadRouteMiddleware')) {
+            \Livewire\Livewire::setFileUploadRouteMiddleware(['web']);
         }
     }
 }
